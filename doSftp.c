@@ -5,56 +5,47 @@
  */
 
 #define MAX_XFER_BUF_SIZE 16384
+#define PATH_MAX 128
 
-int sftp_helloworld2(ssh_session session, sftp_session sftp)
+int sftp_read_sync(ssh_session session, sftp_session sftp, char fileNum[3])
 {
-  int access_type = O_WRONLY | O_CREAT | O_TRUNC;
-  sftp_file file;
-  const char *helloworld = "Hello, World!\n";
-  int length = strlen(helloworld);
-  int rc, nwritten;
-  file = sftp_open(sftp, "/home/pi/Documents/Python_programs/helloworld.txt",
-                   access_type, S_IRWXU);
-  if (file == NULL)
-  {
-    fprintf(stderr, "Can't open file for writing: %s\n",
-            ssh_get_error(session));
-    return SSH_ERROR;
+  char basePathSrc[PATH_MAX] = "/home/pi/Documents/Python_programs/dst/";
+  char basePathDst[PATH_MAX] = "./";
+  char fileNameSrc [10] = "img";
+  char fileExt[5] = ".jpg";
+  char fileNameDst[10] = "test";
+  char *ptr = basePathSrc;
+  strcat(basePathSrc, fileNameSrc);
+  strcat(basePathSrc, fileNum);
+  strcat(basePathSrc, fileExt);
+  strcat(basePathDst, fileNameDst);
+  strcat(basePathDst, fileNum);
+  strcat(basePathDst, fileExt);
+while(*ptr != '\0') {
+    printf("%c", *ptr);    
+    ptr++;
   }
-  nwritten = sftp_write(file, helloworld, length);
-  if (nwritten != length)
-  {
-    fprintf(stderr, "Can't write data to file: %s\n",
-            ssh_get_error(session));
-    sftp_close(file);
-    return SSH_ERROR;
+ptr = basePathDst;
+printf("\n");
+while(*ptr != '\0') {
+    printf("%c", *ptr);    
+    ptr++;
   }
-  rc = sftp_close(file);
-  if (rc != SSH_OK)
-  {
-    fprintf(stderr, "Can't close the written file: %s\n",
-            ssh_get_error(session));
-    return rc;
-  }
-  return SSH_OK;
-}
-
-int sftp_read_sync(ssh_session session, sftp_session sftp)
-{
+printf("\n");
   int access_type;
   sftp_file file;
   char buffer[MAX_XFER_BUF_SIZE];
   int nbytes, nwritten, rc;
   int fd;
   access_type = O_RDONLY;
-  file = sftp_open(sftp, "/home/pi/Documents/Python_programs/dst/img1.jpg",
-                   access_type, 0);
+  file = sftp_open(sftp, basePathSrc,
+                   access_type, 0);//TODO make 2nd argument variable (const char*)
   if (file == NULL) {
       fprintf(stderr, "Can't open file for reading: %s\n",
               ssh_get_error(session));
       return SSH_ERROR;
   }
-  fd = open("./Ckc_3D_Fototest.jpg", O_CREAT | O_WRONLY, 0777);
+  fd = open(basePathDst, O_CREAT | O_WRONLY, 0777);
   if (fd < 0) {
       fprintf(stderr, "Can't open file for writing: %s\n",
               strerror(errno));
@@ -62,7 +53,6 @@ int sftp_read_sync(ssh_session session, sftp_session sftp)
   }
   for (;;) {
       nbytes = sftp_read(file, buffer, sizeof(buffer));
-      fprintf(stderr, "test %i\n",nbytes);
       if (nbytes == 0) {
           break; // EOF
       } else if (nbytes < 0) {
@@ -88,50 +78,20 @@ int sftp_read_sync(ssh_session session, sftp_session sftp)
   return SSH_OK;
 }
 
-int sftp_helloworld(ssh_session session, sftp_session sftp)
+char *my_itoa(int num, char *str)
 {
-  sftp_dir dir;
-  sftp_attributes attributes;
-  int rc;
-  dir = sftp_opendir(sftp, "/home/pi/Documents/Python_programs");
-  if (!dir)
-  {
-    fprintf(stderr, "Directory not opened: %s\n",
-            ssh_get_error(session));
-    return SSH_ERROR;
-  }
-  printf("Name                       Size Perms    Owner\tGroup\n");
-  while ((attributes = sftp_readdir(sftp, dir)) != NULL)
-  {
-    printf("%-20s %10llu %.8o %s(%d)\t%s(%d)\n",
-     attributes->name,
-     (long long unsigned int) attributes->size,
-     attributes->permissions,
-     attributes->owner,
-     attributes->uid,
-     attributes->group,
-     attributes->gid);
-     sftp_attributes_free(attributes);
-  }
-  if (!sftp_dir_eof(dir))
-  {
-    fprintf(stderr, "Can't list directory: %s\n",
-            ssh_get_error(session));
-    sftp_closedir(dir);
-    return SSH_ERROR;
-  }
-  rc = sftp_closedir(dir);
-  if (rc != SSH_OK)
-  {
-    fprintf(stderr, "Can't close directory: %s\n",
-            ssh_get_error(session));
-    return rc;
-  }
+        if(str == NULL)
+        {
+                return NULL;
+        }
+        sprintf(str, "%d", num);
+        return str;
 }
-
 
 int sftp_start_session(ssh_session session)
 {
+  const int imagesToImport = 10;
+  char buf [3];
   sftp_session sftp;
   int rc;
   sftp = sftp_new(session);
@@ -149,6 +109,7 @@ int sftp_start_session(ssh_session session)
     sftp_free(sftp);
     return rc;
   }
+/*
   if(sftp_helloworld2(session, sftp) < 0){
     fprintf(stderr, "SFTP session failed: %s\n",
               ssh_get_error(session));
@@ -157,9 +118,17 @@ int sftp_start_session(ssh_session session)
     fprintf(stderr, "SFTP session failed: %s\n",
               ssh_get_error(session));
   }
-  if(sftp_read_sync(session, sftp) < 0){
-    fprintf(stderr, "SFTP session failed: %s\n",
-              ssh_get_error(session));
+*/
+  for (int i = 1; i < imagesToImport + 1; i++){
+    if(i > 999){
+      fprintf(stderr, "Max amount of images (999) reached. Ending session... \n");
+      break;
+    }
+    my_itoa(i,buf);
+    if(sftp_read_sync(session, sftp, buf) < 0){
+      fprintf(stderr, "SFTP session failed: %s\n",
+                ssh_get_error(session));
+    }
   }
   sftp_free(sftp);
   return SSH_OK;
@@ -222,7 +191,7 @@ int main(){
   my_ssh_session = ssh_new();
   if (my_ssh_session == NULL)
     exit(-1);
-  ssh_options_set(my_ssh_session, SSH_OPTIONS_HOST, "pi@192.168.178.62");
+  ssh_options_set(my_ssh_session, SSH_OPTIONS_HOST, "pi@192.168.90.20");
   //ssh_options_set(my_ssh_session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
   ssh_options_set(my_ssh_session, SSH_OPTIONS_PORT, &port);
   // Connect to server
@@ -258,5 +227,45 @@ int main(){
   }  
    ssh_disconnect(my_ssh_session);
    ssh_free(my_ssh_session);
+
    return 0;
 }
+
+
+
+
+
+/*
+while(*ptr != '\0') {
+    printf("%c", *ptr);    
+    ptr++;
+  }
+  ptr = str;
+  strcpy(str, basePath);
+  strcat(str, dirPath);
+while(*ptr != '\0') {
+    printf("%c", *ptr);    
+    ptr++;
+  }
+*/
+
+/*
+
+
+  char str[PATH_MAX] = "home/libs/yes/kangebeuren\n";
+  char basePath [10] = "hallo";
+  char dirPath [10] = "wereld";
+  char *ptr = str;
+
+while(*ptr != '\0') {
+    printf("%c", *ptr);    
+    ptr++;
+  }
+  ptr = str;
+  strcpy(str, basePath);
+  strcat(str, dirPath);
+while(*ptr != '\0') {
+    printf("%c", *ptr);    
+    ptr++;
+  }
+*/
